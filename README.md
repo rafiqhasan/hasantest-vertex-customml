@@ -1,12 +1,8 @@
-# hasantest-vertex-automl
 # hasantest-vertex-customml
-
 
 Vertex CustomML test project - test
 
-
-
-This project shows an end to end CI/CD experiment of deploying an AutoML pipeline on Vertex Pipelines
+This project shows an end to end CI/CD experiment of deploying an CustomML pipeline on Vertex Pipelines
 ## Getting started
 
 
