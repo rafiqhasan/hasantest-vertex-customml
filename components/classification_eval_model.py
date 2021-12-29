@@ -13,6 +13,7 @@ from google.cloud import aiplatform as aip
 from kfp.v2 import compiler, dsl
 from kfp.v2.dsl import component, pipeline, Artifact, ClassificationMetrics, Input, Output, Model, Metrics
 from typing import NamedTuple
+from kfp.v2.components import executor
 
 _logger = logging.getLogger(__name__)
 
@@ -122,3 +123,22 @@ def main(
     logging.info("deployment decision is %s", dep_decision)
 
     return(dep_decision,)
+
+def executor_main():
+    """Main executor."""
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--executor_input', type=str)
+    parser.add_argument('--function_to_execute', type=str)
+
+    args, _ = parser.parse_known_args()
+    executor_input = json.loads(args.executor_input)
+    function_to_execute = globals()[args.function_to_execute]
+
+    executor.Executor(
+      executor_input=executor_input,
+      function_to_execute=function_to_execute).execute()
+
+if __name__ == '__main__':
+    logging.getLogger().setLevel(logging.INFO)
+    executor_main()

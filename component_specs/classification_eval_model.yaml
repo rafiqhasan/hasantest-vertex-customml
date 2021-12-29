@@ -12,46 +12,16 @@ outputs:
 implementation:
   container:
     image: us-central1-docker.pkg.dev/hasanrafiq-test-331814/vertex-automl-beans-test/latest
-    command:
-    - sh
-    - -c
-    - |2
-
-      if ! [ -x "$(command -v pip)" ]; then
-          python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip
-      fi
-
-      PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'google-cloud-aiplatform' 'kfp==1.8.9' && "$0" "$@"
-    - sh
-    - -ec
-    - |
-      program_path=$(mktemp -d)
-      printf "%s" "$0" > "$program_path/ephemeral_component.py"
-      python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
-    - |2+
-
-      import kfp
-      from kfp.v2 import dsl
-      from kfp.v2.dsl import *
-      from typing import *
-
-      def classification_model_eval_metrics(
-          project: str,
-          location: str,  # "us-central1",
-          api_endpoint: str,  # "us-central1-aiplatform.googleapis.com",
-          thresholds_dict_str: str,
-          model: Input[Artifact],
-          metrics: Output[Metrics],
-          metricsc: Output[ClassificationMetrics],
-      ) -> NamedTuple("Outputs", [("dep_decision", str)]):  # Return parameter.
-
-          import components.classification_eval_model as classification_eval_model
-
-          (dep_decision,) = classification_eval_model.main(project,location,api_endpoint,thresholds_dict_str,model,metrics,metricsc)
-          return (dep_decision,)
-
-    args:
-    - --executor_input
-    - {executorInput: null}
-    - --function_to_execute
-    - classification_model_eval_metrics
+    command: [python, /components/classification_eval_model_v2.py]
+    args: [
+      --executor_input, {executorInput: null},
+      --function_to_execute, main,       ##Name of Python function in the package PY file to execute
+      --project, {inputValue: project},
+      --location, {inputValue: location},
+      --api_endpoint, {inputValue: api_endpoint},
+      --thresholds_dict_str, {inputValue: thresholds_dict_str},
+      --model, {inputPath: model},       ##Artifacts / Metrics ( complex things ) will always map to inputPath
+      --metrics, {outputPath: metrics},  ##Outputs will always map to outputPath
+      --metricsc, {outputPath: metricsc},
+      --dep_decision, {outputPath: dep_decision}
+    ]

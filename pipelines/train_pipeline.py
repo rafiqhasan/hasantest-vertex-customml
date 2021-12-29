@@ -43,10 +43,9 @@ class pipeline_controller():
     
     def _get_pipeline(self):
         """Main method to Create pipeline"""
-        @pipeline(name="automl-tab-beans-training-v2",
+        @pipeline(name=self.display_name,
                           pipeline_root=self.pipeline_root)
         def pipeline_fn(
-            bq_source: str = "bq://aju-dev-demos.beans.beans1",
             display_name: str = self.display_name,
             project: str = self.project_id,
             gcp_region: str = self.region,
@@ -59,66 +58,55 @@ class pipeline_controller():
             # eval_op = kfp.components.load_component('component_specs/classification_eval_model.yaml')
             
             #Option 2 -> Python component wrapped as reusable package( preferred )
-            eval_op = kfp.components.load_component('component_specs/classification_eval_model_v2.yaml')
+            # eval_op = kfp.components.load_component('component_specs/classification_eval_model_v2.yaml')
 
-            #Start pipeline formation
-            dataset_create_op = gcc_aip.TabularDatasetCreateOp(
-                project=project, display_name=display_name, bq_source=bq_source
-            )
+            #STEP: For non Auto-ML call
+            training_args = ['--train_file', 'gs://gcs-hasanrafiq-test-331814/ml_data/taxi_dataset/train.csv',
+                             '--eval_file', 'gs://gcs-hasanrafiq-test-331814/ml_data/taxi_dataset/eval.csv',
+                             '--model_save_location', 'gs://gcs-hasanrafiq-test-331814/ml_data/taxi_dataset/model/',
+                             '--epochs', '10',
+                             '--hidden_layers','2'
+                            ]
 
-            training_op = gcc_aip.AutoMLTabularTrainingJobRunOp(
-                project=project,
-                display_name=display_name,
-                optimization_prediction_type="classification",
-                budget_milli_node_hours=100,
-                column_transformations=[
-                    {"numeric": {"column_name": "Area"}},
-                    {"numeric": {"column_name": "Perimeter"}},
-                    {"numeric": {"column_name": "MajorAxisLength"}},
-                    {"numeric": {"column_name": "MinorAxisLength"}},
-                    {"numeric": {"column_name": "AspectRation"}},
-                    {"numeric": {"column_name": "Eccentricity"}},
-                    {"numeric": {"column_name": "ConvexArea"}},
-                    {"numeric": {"column_name": "EquivDiameter"}},
-                    {"numeric": {"column_name": "Extent"}},
-                    {"numeric": {"column_name": "Solidity"}},
-                    {"numeric": {"column_name": "roundness"}},
-                    {"numeric": {"column_name": "Compactness"}},
-                    {"numeric": {"column_name": "ShapeFactor1"}},
-                    {"numeric": {"column_name": "ShapeFactor2"}},
-                    {"numeric": {"column_name": "ShapeFactor3"}},
-                    {"numeric": {"column_name": "ShapeFactor4"}},
-                    {"categorical": {"column_name": "Class"}},
-                ],
-                dataset=dataset_create_op.outputs["dataset"],
-                target_column="Class",
-            )
+            training_op = gcc_aip.CustomPythonPackageTrainingJobRunOp(
+                            project=project,
+                            display_name=display_name,
+                            python_package_gcs_uri="gs://gcs-hasanrafiq-test-331814/ml_data/taxi_dataset/ml_scripts/trainer-0.1.tar.gz",
+                            staging_bucket='gs://cloud-ai-platform-35f2698c-5046-4c70-857e-14cb44e3950a/ml_staging',
+                            # base_output_dir='gs://cloud-ai-platform-35f2698c-5046-4c70-857e-14cb44e3950a/ml_staging',
+                            python_module_name="trainer.task",
+                            container_uri='us-docker.pkg.dev/vertex-ai/training/tf-cpu.2-7:latest',
+                            replica_count=1,
+                            location=gcp_region,
+                            machine_type="n1-standard-4",
+                            args=training_args
+                          )
 
-            model_eval_task = eval_op(
-                project,
-                gcp_region,
-                api_endpoint,
-                thresholds_dict_str,
-                training_op.outputs["model"],
-            )
+#             model_eval_task = eval_op(
+#                 project,
+#                 gcp_region,
+#                 api_endpoint,
+#                 thresholds_dict_str,
+#                 training_op.outputs["model"],
+#             )
 
-            with dsl.Condition(
-                model_eval_task.outputs["dep_decision"] == "true",
-                name="deploy_decision",
-            ):
+#             with dsl.Condition(
+#                 model_eval_task.outputs["dep_decision"] == "true",
+#                 name="deploy_decision",
+#             ):
 
-                endpoint_op = gcc_aip.EndpointCreateOp(
-                    project=project,
-                    location=gcp_region,
-                    display_name="train-automl-beans",
-                )
+#                 endpoint_op = gcc_aip.EndpointCreateOp(
+#                     project=project,
+#                     location=gcp_region,
+#                     display_name="train-automl-beans",
+#                 )
 
-                gcc_aip.ModelDeployOp(
-                    model=training_op.outputs["model"],
-                    endpoint=endpoint_op.outputs["endpoint"],
-                    dedicated_resources_min_replica_count=1,
-                    dedicated_resources_max_replica_count=1,
-                    dedicated_resources_machine_type="n1-standard-4",
-                )
+#                 gcc_aip.ModelDeployOp(
+#                     model=training_op.outputs["model"],
+#                     endpoint=endpoint_op.outputs["endpoint"],
+#                     dedicated_resources_min_replica_count=1,
+#                     dedicated_resources_max_replica_count=1,
+#                     dedicated_resources_machine_type="n1-standard-4",
+#                 )
             
         return pipeline_fn
