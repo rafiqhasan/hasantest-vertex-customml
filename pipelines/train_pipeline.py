@@ -50,30 +50,29 @@ class pipeline_controller():
             project: str = self.project_id,
             gcp_region: str = self.region,
             api_endpoint: str = "us-central1-aiplatform.googleapis.com",
-            thresholds_dict_str: str = '{"auRoc": 0.95}',
+            thresholds_dict_str: str = '{"rmse_threshold": 4.8}',
         ):
             
             #Load all reusable custom components
-            #Option 1 -> Python function component wrapped as reusable function
-            # eval_op = kfp.components.load_component('component_specs/classification_eval_model.yaml')
-            
-            #Option 2 -> Python component wrapped as reusable package( preferred )
-            # eval_op = kfp.components.load_component('component_specs/classification_eval_model_v2.yaml')
+            eval_op = kfp.components.load_component('component_specs/regression_eval_model.yaml')
 
             #STEP: For non Auto-ML call
             training_args = ['--train_file', 'gs://gcs-hasanrafiq-test-331814/ml_data/taxi_dataset/train.csv',
                              '--eval_file', 'gs://gcs-hasanrafiq-test-331814/ml_data/taxi_dataset/eval.csv',
                              '--model_save_location', 'gs://gcs-hasanrafiq-test-331814/ml_data/taxi_dataset/model/',
                              '--epochs', '10',
-                             '--hidden_layers','2'
+                             '--hidden_layers','2',
+                             '--experiment_name', str(f"{display_name}-train-job") ,
+                             '--mlmd_region', str(gcp_region) ,
+                             '--project', str(project) ,
                             ]
 
             training_op = gcc_aip.CustomPythonPackageTrainingJobRunOp(
                             project=project,
                             display_name=display_name,
+                            service_account='318948681665-compute@developer.gserviceaccount.com',  ##Needed for Vertex MLMD access
                             python_package_gcs_uri="gs://gcs-hasanrafiq-test-331814/ml_data/taxi_dataset/ml_scripts/trainer-0.1.tar.gz",
                             staging_bucket='gs://cloud-ai-platform-35f2698c-5046-4c70-857e-14cb44e3950a/ml_staging',
-                            # base_output_dir='gs://cloud-ai-platform-35f2698c-5046-4c70-857e-14cb44e3950a/ml_staging',
                             python_module_name="trainer.task",
                             container_uri='us-docker.pkg.dev/vertex-ai/training/tf-cpu.2-7:latest',
                             replica_count=1,
@@ -82,14 +81,13 @@ class pipeline_controller():
                             args=training_args
                           )
 
-#             model_eval_task = eval_op(
-#                 project,
-#                 gcp_region,
-#                 api_endpoint,
-#                 thresholds_dict_str,
-#                 training_op.outputs["model"],
-#             )
-
+            model_eval_task = eval_op(
+                                    project,
+                                    gcp_region,
+                                    str(f"{display_name}-train-job"),
+                                    thresholds_dict_str,
+                                    training_op.outputs["model"])
+                
 #             with dsl.Condition(
 #                 model_eval_task.outputs["dep_decision"] == "true",
 #                 name="deploy_decision",

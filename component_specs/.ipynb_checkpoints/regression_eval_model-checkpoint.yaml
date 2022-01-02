@@ -1,0 +1,25 @@
+name: model eval metrics
+inputs:
+- {name: project, type: String}
+- {name: location, type: String}
+- {name: experiment_name, type: String}
+- {name: thresholds_dict_str, type: String}
+- {name: model, type: Artifact}
+outputs:
+- {name: metrics, type: Metrics}
+- {name: dep_decision, type: String}
+implementation:
+  container:
+    image: us-central1-docker.pkg.dev/hasanrafiq-test-331814/vertex-customml-pipeline-test/latest
+    command: [python, /components/regression_eval_model.py]
+    args: [
+      --executor_input, {executorInput: null},
+      --function_to_execute, main,       ##Name of Python function in the package PY file to execute
+      --project, {inputValue: project},
+      --location, {inputValue: location},
+      --experiment_name, {inputValue: experiment_name},
+      --thresholds_dict_str, {inputValue: thresholds_dict_str},
+      --model, {inputPath: model},       ##Artifacts / Metrics ( complex things ) will always map to inputPath
+      --metrics, {outputPath: metrics},  ##Outputs will always map to outputPath
+      --dep_decision, {outputPath: dep_decision}
+    ]
