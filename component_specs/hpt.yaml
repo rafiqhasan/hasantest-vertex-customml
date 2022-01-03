@@ -1,0 +1,39 @@
+name: hpt run
+inputs:
+- {name: project, type: String}
+- {name: display_name, type: String}
+- {name: service_account, type: String}
+- {name: executor_image_uri, type: String}
+- {name: package_uri, type: String}
+- {name: python_module, type: String}
+- {name: hpt_args, type: List}
+- {name: metric_id, type: String}
+- {name: goal, type: Integer}
+- {name: location, type: String}
+- {name: api_endpoint, type: String}
+outputs:
+- {name: metrics, type: Metrics}
+- {name: lr, type: Float}
+- {name: hidden_layers, type: Float}
+implementation:
+  container:
+    image: us-central1-docker.pkg.dev/hasanrafiq-test-331814/vertex-customml-pipeline-test/latest
+    command: [python, /components/hpt.py]
+    args: [
+      --executor_input, {executorInput: null},
+      --function_to_execute, main,       ##Name of Python function in the package PY file to execute
+      --project, {inputValue: project},
+      --display_name, {inputValue: display_name},
+      --service_account, {inputValue: service_account},
+      --executor_image_uri, {inputValue: executor_image_uri},
+      --package_uri, {inputValue: package_uri},
+      --python_module, {inputValue: python_module},
+      --hpt_args, {inputValue: hpt_args},
+      --metric_id, {inputValue: metric_id},
+      --goal, {inputValue: goal},
+      --location, {inputValue: location},
+      --api_endpoint, {inputValue: api_endpoint},
+      --metrics, {outputPath: metrics},  ##Outputs will always map to outputPath
+      --lr, {outputPath: lr},
+      --hidden_layers, {outputPath: hidden_layers} 
+    ]

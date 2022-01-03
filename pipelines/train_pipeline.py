@@ -7,101 +7,127 @@ from kfp.v2.dsl import component, pipeline, Artifact, ClassificationMetrics, Inp
 
 from google.cloud import aiplatform
 from google_cloud_pipeline_components import aiplatform as gcc_aip
-from typing import NamedTuple
+from typing import NamedTuple, Dict
 
 from google.cloud import aiplatform
 
-@component(
-    base_image="gcr.io/deeplearning-platform-release/tf2-cpu.2-7:latest",
-    output_component_file="tabular_eval_component.yaml",
-    packages_to_install=["google-cloud-aiplatform"],
-)
-def create_hyperparameter_tuning_job_python_package_sample(
-    project: str,
-    display_name: str,
-    service_account: str,
-    executor_image_uri: str,
-    package_uri: str,
-    python_module: str,
-    hpt_args: list,
-    location: str = "us-central1",
-    api_endpoint: str = "us-central1-aiplatform.googleapis.com"
-):
-    from google.cloud import aiplatform
-    import time
+# @component(
+#     base_image="gcr.io/deeplearning-platform-release/tf2-cpu.2-7:latest",
+#     packages_to_install=["google-cloud-aiplatform", "numpy"],
+# )
+# def create_hyperparameter_tuning_job_python_package_sample(
+#     project: str,
+#     display_name: str,
+#     service_account: str,
+#     executor_image_uri: str,
+#     package_uri: str,
+#     python_module: str,
+#     hpt_args: list,
+#     metric_id: str,
+#     goal: int,
+#     metrics: Output[Metrics],
+#     location: str = "us-central1",
+#     api_endpoint: str = "us-central1-aiplatform.googleapis.com"
+# ) -> NamedTuple("Outputs", [("lr", float), ("hidden_layers", int)]):
     
-    _POLLING_INTERVAL_IN_SECONDS = 20
-
-    _JOB_COMPLETE_STATES = (
-        'JobState.JOB_STATE_SUCCEEDED',
-        'JobState.JOB_STATE_FAILED',
-        'JobState.JOB_STATE_CANCELLED',
-        'JobState.JOB_STATE_PAUSED'
-    )
+#     from google.cloud import aiplatform
+#     import time
     
-    # The AI Platform services require regional API endpoints.
-    client_options = {"api_endpoint": api_endpoint}
-    # Initialize client that will be used to create and send requests.
-    # This client only needs to be created once, and can be reused for multiple requests.
-    client = aiplatform.gapic.JobServiceClient(client_options=client_options)
+#     _POLLING_INTERVAL_IN_SECONDS = 20
 
-    # study_spec
-    metric = {
-        "metric_id": "eval_rmse",
-        "goal": aiplatform.gapic.StudySpec.MetricSpec.GoalType.MINIMIZE,
-    }
-
-    lr = {
-            "parameter_id": "lr",
-            "double_value_spec": {"min_value": 0.001, "max_value": 0.05}
-    }
+#     _JOB_COMPLETE_STATES = (
+#         'JobState.JOB_STATE_SUCCEEDED',
+#         'JobState.JOB_STATE_FAILED',
+#         'JobState.JOB_STATE_CANCELLED',
+#         'JobState.JOB_STATE_PAUSED'
+#     )
     
-    hidden_layers = {
-            "parameter_id": "hidden_layers",
-            "integer_value_spec": {"min_value": 1, "max_value": 4}
-    }
+#     # The AI Platform services require regional API endpoints.
+#     client_options = {"api_endpoint": api_endpoint}
+#     # Initialize client that will be used to create and send requests.
+#     # This client only needs to be created once, and can be reused for multiple requests.
+#     client = aiplatform.gapic.JobServiceClient(client_options=client_options)
 
-    # trial_job_spec
-    machine_spec = {
-        "machine_type": "n1-standard-4"
-    }
-    worker_pool_spec = {
-        "machine_spec": machine_spec,
-        "replica_count": 1,
-        "python_package_spec": {
-            "executor_image_uri": executor_image_uri,
-            "package_uris": [package_uri],
-            "python_module": python_module,
-            "args": hpt_args,
-        },
-    }
+#     # study_spec
+#     metric = {
+#         "metric_id": metric_id,
+#         "goal": goal,
+#     }
 
-    #Create HPT Job
-    hyperparameter_tuning_job = {
-        "display_name": display_name,
-        "max_trial_count": 2,
-        "parallel_trial_count": 2,
-        "study_spec": {
-            "metrics": [metric],
-            "parameters": [lr, hidden_layers],
-            "algorithm": aiplatform.gapic.StudySpec.Algorithm.RANDOM_SEARCH,
-        },
-        "trial_job_spec": {"worker_pool_specs": [worker_pool_spec], "service_account": service_account},
-    }
-    parent = f"projects/{project}/locations/{location}"
-    name = client.create_hyperparameter_tuning_job(
-        parent=parent, hyperparameter_tuning_job=hyperparameter_tuning_job
-    )
-    print("HPT Job:", name.name)
+#     lr = {
+#             "parameter_id": "lr",
+#             "double_value_spec": {"min_value": 0.001, "max_value": 0.05}
+#     }
     
-    #Get status of HPT job recursively
-    status = client.get_hyperparameter_tuning_job(name=name.name) #initial status
-    while str(status.state) not in _JOB_COMPLETE_STATES:
-        status = client.get_hyperparameter_tuning_job(name=name.name)
-        print("HPT Status:", str(status.state))
-        time.sleep(_POLLING_INTERVAL_IN_SECONDS)
+#     hidden_layers = {
+#             "parameter_id": "hidden_layers",
+#             "integer_value_spec": {"min_value": 1, "max_value": 4}
+#     }
+
+#     # trial_job_spec
+#     machine_spec = {
+#         "machine_type": "n1-standard-4"
+#     }
+#     worker_pool_spec = {
+#         "machine_spec": machine_spec,
+#         "replica_count": 1,
+#         "python_package_spec": {
+#             "executor_image_uri": executor_image_uri,
+#             "package_uris": [package_uri],
+#             "python_module": python_module,
+#             "args": hpt_args,
+#         },
+#     }
+
+#     #Create HPT Job
+#     hyperparameter_tuning_job = {
+#         "display_name": display_name,
+#         "max_trial_count": 2,
+#         "parallel_trial_count": 2,
+#         "study_spec": {
+#             "metrics": [metric],
+#             "parameters": [lr, hidden_layers],
+#             "algorithm": aiplatform.gapic.StudySpec.Algorithm.RANDOM_SEARCH,
+#         },
+#         "trial_job_spec": {"worker_pool_specs": [worker_pool_spec], "service_account": service_account},
+#     }
+#     parent = f"projects/{project}/locations/{location}"
+#     name = client.create_hyperparameter_tuning_job(
+#         parent=parent, hyperparameter_tuning_job=hyperparameter_tuning_job
+#     )
+#     print("HPT Job:", name.name)
+    
+#     #Get status of HPT job recursively and wait
+#     status = client.get_hyperparameter_tuning_job(name=name.name) #initial status
+#     while str(status.state) not in _JOB_COMPLETE_STATES:
+#         status = client.get_hyperparameter_tuning_job(name=name.name)
+#         print("HPT Status:", str(status.state))
+#         time.sleep(_POLLING_INTERVAL_IN_SECONDS)
         
-    print("HPT ended")
+#     #When HPT ends, get best params
+#     best_high = -9999999999
+#     best_low = 9999999999
+#     best_trial = 0
+#     param_dict = {}
+#     for trials in status.trials:
+#         metric_value = trials.final_measurement.metrics[-1].value
+#         trial_id = trials.id
+#         if goal == aiplatform.gapic.StudySpec.MetricSpec.GoalType.MINIMIZE and metric_value < best_low:
+#             best_low = metric_value
+#             best_trial = trial_id
+#             best_params = trials.parameters
+#         elif goal == aiplatform.gapic.StudySpec.MetricSpec.GoalType.MAXIMIZE and metric_value > best_high:
+#             best_high = metric_value
+#             best_trial = trial_id
+#             best_params = trials.parameters
+    
+#     #Log best params to metrics
+#     for params in best_params:
+#         param_dict[params.parameter_id] = params.value
+#         metrics.log_metric(params.parameter_id, params.value)
+    
+#     print("HPT ended")
+#     return ( param_dict["lr"], int(param_dict["hidden_layers"]))
 
 #Main pipeline class
 class pipeline_controller():
@@ -118,8 +144,6 @@ class pipeline_controller():
         compiler.Compiler().compile(
             pipeline_func=self.pipeline, package_path=self.template_path
         )
-        
-        ##Write JSON file to GCS
         
     def _submit_job(self):
         """Method to Submit ML Pipeline job"""
@@ -149,6 +173,7 @@ class pipeline_controller():
             
             #Load all reusable custom components
             eval_op = kfp.components.load_component('component_specs/regression_eval_model.yaml')
+            hpt_op = kfp.components.load_component('component_specs/hpt.yaml')
 
             #STEP: For non Auto-ML call
             hpt_args = ['--train_file', 'gs://gcs-hasanrafiq-test-331814/ml_data/taxi_dataset/train.csv',
@@ -161,7 +186,7 @@ class pipeline_controller():
                         ]
             
             #HPT
-            hpt_task = create_hyperparameter_tuning_job_python_package_sample(
+            hpt_task = hpt_op(
                 project=project,
                 display_name=display_name,
                 service_account='318948681665-compute@developer.gserviceaccount.com',  ##Needed for Vertex MLMD access
@@ -169,6 +194,8 @@ class pipeline_controller():
                 package_uri="gs://gcs-hasanrafiq-test-331814/ml_data/taxi_dataset/ml_scripts/trainer-0.1.tar.gz",
                 python_module="trainer.task",
                 hpt_args=hpt_args,
+                metric_id="eval_rmse",
+                goal=aiplatform.gapic.StudySpec.MetricSpec.GoalType.MINIMIZE,
                 location=gcp_region,
                 api_endpoint=str(f"{gcp_region}-aiplatform.googleapis.com")
             )
@@ -178,8 +205,9 @@ class pipeline_controller():
                              '--eval_file', 'gs://gcs-hasanrafiq-test-331814/ml_data/taxi_dataset/eval.csv',
                              '--model_save_location', 'gs://gcs-hasanrafiq-test-331814/ml_data/taxi_dataset/model/',
                              '--epochs', '10',
-                             '--hidden_layers','2',
-                             '--experiment_name', str(f"{display_name}-train-job") ,
+                             '--hidden_layers', str(hpt_task.outputs["hidden_layers"]),
+                             '--lr', str(hpt_task.outputs["lr"]),
+                             '--experiment_name', str(f"{display_name}-train-job"),
                              '--mlmd_region', str(gcp_region) ,
                              '--project', str(project) ,
                             ]
