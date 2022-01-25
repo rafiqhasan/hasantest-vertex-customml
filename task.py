@@ -4,6 +4,7 @@
 
 import hypertune
 import pandas as pd
+import os
 from google.cloud import aiplatform
 import matplotlib.pyplot as plt
 import numpy as np
@@ -385,11 +386,20 @@ def main(args):
                                             pickup_longitude=tf.TensorSpec([None,], dtype= tf.float32, name='pickup_longitude')
                                             )
 
+    ##model Saving
+    try:
+        model_save_location = os.environ['AIP_MODEL_DIR']
+        print("Saving at AIP_MODEL_DIR ", model_save_location) 
+    except:
+        version = "1"  #{'serving_default': call_output}
+        model_save_location = args.model_save_location + version
+        print("Saving at custom dir ", model_save_location)        
+        
     print("Saving model...")
-    version = "1"  #{'serving_default': call_output}
+    
     tf.saved_model.save(
         m_,
-        args.model_save_location + version,
+        model_save_location,
         signatures=serving
     )
 

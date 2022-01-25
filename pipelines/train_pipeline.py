@@ -11,124 +11,6 @@ from typing import NamedTuple, Dict
 
 from google.cloud import aiplatform
 
-# @component(
-#     base_image="gcr.io/deeplearning-platform-release/tf2-cpu.2-7:latest",
-#     packages_to_install=["google-cloud-aiplatform", "numpy"],
-# )
-# def create_hyperparameter_tuning_job_python_package_sample(
-#     project: str,
-#     display_name: str,
-#     service_account: str,
-#     executor_image_uri: str,
-#     package_uri: str,
-#     python_module: str,
-#     hpt_args: list,
-#     metric_id: str,
-#     goal: int,
-#     metrics: Output[Metrics],
-#     location: str = "us-central1",
-#     api_endpoint: str = "us-central1-aiplatform.googleapis.com"
-# ) -> NamedTuple("Outputs", [("lr", float), ("hidden_layers", int)]):
-    
-#     from google.cloud import aiplatform
-#     import time
-    
-#     _POLLING_INTERVAL_IN_SECONDS = 20
-
-#     _JOB_COMPLETE_STATES = (
-#         'JobState.JOB_STATE_SUCCEEDED',
-#         'JobState.JOB_STATE_FAILED',
-#         'JobState.JOB_STATE_CANCELLED',
-#         'JobState.JOB_STATE_PAUSED'
-#     )
-    
-#     # The AI Platform services require regional API endpoints.
-#     client_options = {"api_endpoint": api_endpoint}
-#     # Initialize client that will be used to create and send requests.
-#     # This client only needs to be created once, and can be reused for multiple requests.
-#     client = aiplatform.gapic.JobServiceClient(client_options=client_options)
-
-#     # study_spec
-#     metric = {
-#         "metric_id": metric_id,
-#         "goal": goal,
-#     }
-
-#     lr = {
-#             "parameter_id": "lr",
-#             "double_value_spec": {"min_value": 0.001, "max_value": 0.05}
-#     }
-    
-#     hidden_layers = {
-#             "parameter_id": "hidden_layers",
-#             "integer_value_spec": {"min_value": 1, "max_value": 4}
-#     }
-
-#     # trial_job_spec
-#     machine_spec = {
-#         "machine_type": "n1-standard-4"
-#     }
-#     worker_pool_spec = {
-#         "machine_spec": machine_spec,
-#         "replica_count": 1,
-#         "python_package_spec": {
-#             "executor_image_uri": executor_image_uri,
-#             "package_uris": [package_uri],
-#             "python_module": python_module,
-#             "args": hpt_args,
-#         },
-#     }
-
-#     #Create HPT Job
-#     hyperparameter_tuning_job = {
-#         "display_name": display_name,
-#         "max_trial_count": 2,
-#         "parallel_trial_count": 2,
-#         "study_spec": {
-#             "metrics": [metric],
-#             "parameters": [lr, hidden_layers],
-#             "algorithm": aiplatform.gapic.StudySpec.Algorithm.RANDOM_SEARCH,
-#         },
-#         "trial_job_spec": {"worker_pool_specs": [worker_pool_spec], "service_account": service_account},
-#     }
-#     parent = f"projects/{project}/locations/{location}"
-#     name = client.create_hyperparameter_tuning_job(
-#         parent=parent, hyperparameter_tuning_job=hyperparameter_tuning_job
-#     )
-#     print("HPT Job:", name.name)
-    
-#     #Get status of HPT job recursively and wait
-#     status = client.get_hyperparameter_tuning_job(name=name.name) #initial status
-#     while str(status.state) not in _JOB_COMPLETE_STATES:
-#         status = client.get_hyperparameter_tuning_job(name=name.name)
-#         print("HPT Status:", str(status.state))
-#         time.sleep(_POLLING_INTERVAL_IN_SECONDS)
-        
-#     #When HPT ends, get best params
-#     best_high = -9999999999
-#     best_low = 9999999999
-#     best_trial = 0
-#     param_dict = {}
-#     for trials in status.trials:
-#         metric_value = trials.final_measurement.metrics[-1].value
-#         trial_id = trials.id
-#         if goal == aiplatform.gapic.StudySpec.MetricSpec.GoalType.MINIMIZE and metric_value < best_low:
-#             best_low = metric_value
-#             best_trial = trial_id
-#             best_params = trials.parameters
-#         elif goal == aiplatform.gapic.StudySpec.MetricSpec.GoalType.MAXIMIZE and metric_value > best_high:
-#             best_high = metric_value
-#             best_trial = trial_id
-#             best_params = trials.parameters
-    
-#     #Log best params to metrics
-#     for params in best_params:
-#         param_dict[params.parameter_id] = params.value
-#         metrics.log_metric(params.parameter_id, params.value)
-    
-#     print("HPT ended")
-#     return ( param_dict["lr"], int(param_dict["hidden_layers"]))
-
 #Main pipeline class
 class pipeline_controller():
     def __init__(self, template_path, display_name, pipeline_root, project_id, region):
@@ -153,7 +35,7 @@ class pipeline_controller():
             template_path=self.template_path,
             pipeline_root=self.pipeline_root,
             parameter_values={"project": self.project_id, "display_name": self.display_name},
-            enable_caching=True
+            enable_caching=False
         )
 
         #And finally, run the job:
@@ -220,6 +102,8 @@ class pipeline_controller():
                             staging_bucket='gs://cloud-ai-platform-35f2698c-5046-4c70-857e-14cb44e3950a/ml_staging',
                             python_module_name="trainer.task",
                             container_uri='us-docker.pkg.dev/vertex-ai/training/tf-cpu.2-7:latest',
+                            model_serving_container_image_uri='us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-7:latest',
+                            model_display_name='vertex-customml-taxi',
                             replica_count=1,
                             location=gcp_region,
                             machine_type="n1-standard-4",
@@ -234,23 +118,23 @@ class pipeline_controller():
                                     thresholds_dict_str,
                                     training_op.outputs["model"])
                 
-#             with dsl.Condition(
-#                 model_eval_task.outputs["dep_decision"] == "true",
-#                 name="deploy_decision",
-#             ):
+            with dsl.Condition(
+                model_eval_task.outputs["dep_decision"] == "true",
+                name="deploy_decision",
+            ):
 
-#                 endpoint_op = gcc_aip.EndpointCreateOp(
-#                     project=project,
-#                     location=gcp_region,
-#                     display_name="train-automl-beans",
-#                 )
+                endpoint_op = gcc_aip.EndpointCreateOp(
+                    project=project,
+                    location=gcp_region,
+                    display_name="vertex-customml-taxi",
+                )
 
-#                 gcc_aip.ModelDeployOp(
-#                     model=training_op.outputs["model"],
-#                     endpoint=endpoint_op.outputs["endpoint"],
-#                     dedicated_resources_min_replica_count=1,
-#                     dedicated_resources_max_replica_count=1,
-#                     dedicated_resources_machine_type="n1-standard-4",
-#                 )
+                gcc_aip.ModelDeployOp(
+                    model=training_op.outputs["model"],
+                    endpoint=endpoint_op.outputs["endpoint"],
+                    dedicated_resources_min_replica_count=1,
+                    dedicated_resources_max_replica_count=1,
+                    dedicated_resources_machine_type="n1-standard-4",
+                )
             
         return pipeline_fn

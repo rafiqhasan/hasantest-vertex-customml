@@ -25,8 +25,8 @@ def main(
     thresholds_dict_str: str,
     model: Input[Artifact],
     metrics: Output[Metrics],
-) -> NamedTuple("Outputs", [("dep_decision", str)]):  # Return parameter.
-
+) -> NamedTuple("Outputs", [("dep_decision", str), ("eval_rmse", float)]):  # Return parameter.
+     
     import json
     import logging
     from google.cloud import aiplatform
@@ -55,7 +55,7 @@ def main(
         dep_decision = "false"
     logging.info("deployment decision is %s", dep_decision)
 
-    return (dep_decision,)
+    return ( dep_decision, float(eval_rmse))
 
 def executor_main():
     """Main executor."""
